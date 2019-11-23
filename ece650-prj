@@ -3,6 +3,7 @@
 #include <iostream>
 #include <memory>
 #include <vector>
+#include <algorithm>
 #include <string>
 #include <set>
 using namespace std;
@@ -14,7 +15,9 @@ int jarray[5000];
 vector<int> ivector; // vector to store the first value of each vertex.
 vector<int> jvector; // vector to store the second value of each vertex.
 vector<int> indexvector; // vector to store the index number of duplicate vertex coordinate.
-vector<int> CVresult;
+vector<int> edgeVector; // construct a vector to store the edge list。
+vector<int> CVresult2;
+vector<int> CVresult1;
 int EleLength;// the number of edge end and start points.
 int VNumber; //the number of vertexs.
 int ENumber; //the number of edges.
@@ -91,6 +94,78 @@ int eInVertex(){
     return temp;
 }
 
+
+// The following is APPROX-VC-1.
+// get the maxcount value and set both values in this vertex to 99999.
+int getMaxCount(){
+    int infCount = 0; // used to count the number of 99999
+    int maxCount = 0, index = 0, nCount = 0;
+    // get the index of maxcount value.
+    for (int i = 0; i < edgeVector.size(); ++i) {
+        if (edgeVector[i] == 99999){
+            infCount = infCount + 1;
+            continue;
+        }
+        for (int j = 0; j < edgeVector.size(); ++j) {
+            if (edgeVector[i] == edgeVector[j]) nCount = nCount + 1;
+        }
+        //cout << "nCount is " << nCount << endl;
+        if (nCount > maxCount){
+            maxCount = nCount;
+            index = i;
+        }
+        nCount = 0;
+    }
+
+    // assign 99999 to all the vertex (both two values) including countmax value.
+    int inf = edgeVector[index];
+    for (int k = 0; k < edgeVector.size(); ++k) {
+        if (edgeVector[k] == inf){
+            edgeVector[k] = 99999;
+            if (k % 2 == 0) edgeVector[k + 1] = 99999;
+            else edgeVector[k - 1] = 99999;
+        }
+    }
+    // if all value equals to 99999, return 99999 to function APPROXVC1.
+    if (infCount == edgeVector.size()){
+        return 99999;
+    }
+
+    // push the maxcount to vertex cover vector.
+    CVresult1.push_back(inf);
+
+    // return the index for iarray and jarray.
+    // maybe useless for APPROXVC1.
+    if (index % 2 == 0){
+        index = index / 2;
+    } else index = (index - 1) / 2;
+    return index;
+}
+
+int APPROXVC1(){
+    for (int i = 0; i < EleLength; ++i) {
+        edgeVector.push_back(edgeList[i]);
+    }
+
+    while (1){
+        if (getMaxCount() == 99999) break;
+    }
+
+    // sort the vertex cover result.
+    sort(CVresult1.begin(), CVresult1.end(), less<int>());
+    cout << "APPROX-VC-1: ";
+    for (int j = 0; j < CVresult1.size(); ++j) {
+        if (j != CVresult1.size()-1) cout << CVresult1[j] << ",";
+        else cout << CVresult1[j] << endl;
+    }
+    // clear all the vector for next input.
+    CVresult1.clear();
+    edgeVector.clear();
+    return 0;
+}
+
+
+// The following is APPROX-VC-2.
 // function to get the input value index number of input verctor.
 int getIndex(int value, vector<int> vector){
     for (int i = 0; i < vector.size(); ++i) {
@@ -99,48 +174,76 @@ int getIndex(int value, vector<int> vector){
     }
     return 0;
 }
-int vectorDelete(){
-    // define the smallest function to get the min value.
-    vector<int>::iterator ismallest = max_element(begin(ivector), end(ivector));
-    vector<int>::iterator jsmallest = max_element(begin(jvector), end(jvector));
+
+int APPROXVC2(){
+    // transfer the values in array to vector.
     for (int n = 0; n < ENumber; ++n){
         ivector.push_back(iarray[n]);
         jvector.push_back(jarray[n]);
     }
     int ivalue, jvalue;
-    for (int m = 0; m < ENumber; ++m) {
-        if (iarray[m] < 99999) {
-            ivalue = iarray[m];
-            jvalue = iarray[m];
+
+    for (; ; ) {
+        // define the smallest iterator to get the min value.
+        vector<int>::iterator ismallest = min_element(begin(ivector), end(ivector));
+        vector<int>::iterator jsmallest = min_element(begin(jvector), end(jvector));
+        int smallest = min(*ismallest, *jsmallest);
+        int indexVC;
+        // get the index of smallest value.
+        cout << "ismallest is " << *ismallest << endl;
+        cout << "jsmallest is " << *jsmallest << endl;
+        if (smallest == *ismallest) {
+            indexVC = distance(begin(ivector), ismallest);
+        } else indexVC = distance(begin(jvector), jsmallest);
+        if (smallest < 99999) {
+            ivalue = iarray[indexVC];
+            cout << "ivalue is " << ivalue << endl;
+            jvalue = jarray[indexVC];
+            cout << "jvalue is " << jvalue << endl;
+            // get all the index of same i and j value.
             getIndex(ivalue, ivector);
             getIndex(jvalue, jvector);
             getIndex(ivalue, jvector);
             getIndex(jvalue, ivector);
             // use the indexvector to set the indicated value to a huge number.
             for (int i = 0; i < indexvector.size(); ++i) {
-                //cout << indexvector[i] << " ";
                 ivector[indexvector[i]] = 99999;
                 jvector[indexvector[i]] = 99999;
-                /*
-                cout << "********* ivector ******" << endl;
-                for (int j = 0; j < ENumber; ++j) {
-                    cout << ivector[j] << " ";
-                }
-                cout << endl;
-                 */
             }
             // store the vertex value into the cover vertex result vector.
-            CVresult.push_back(ivalue);
-            CVresult.push_back(jvalue);
+            CVresult2.push_back(ivalue);
+            CVresult2.push_back(jvalue);
             // clear the indexvector.
             indexvector.clear();
-            //cout << endl;
-        }
+            for (int j = 0; j < ivector.size(); ++j) {
+                cout << ivector[j] << ",";
+            }
+            cout << endl;
+            for (int k = 0; k < jvector.size(); ++k) {
+                cout << jvector[k] << ",";
+            }
+            cout << endl;
+        } else break;
     }
-    for (int j = 0; j < CVresult.size(); ++j) {
-        cout << CVresult[j] << " ";
+    /* problem:
+     * when input
+     * V 5
+     * E {<0,4>,<1,4>,<0,3>,<2,0>,<2,1>,<1,0>,<3,1>}
+     * the result returns APPROX-VC-2: 0,1,2,4
+     * However,  0, 1 is a better result.
+     *
+     */
+    // sort the vertex cover result.
+    sort(CVresult2.begin(), CVresult2.end(), less<int>());
+    cout << "APPROX-VC-2: ";
+    for (int j = 0; j < CVresult2.size(); ++j) {
+        if (j != CVresult2.size()-1) cout << CVresult2[j] << ",";
+        else cout << CVresult2[j] << endl;
     }
-    cout << endl;
+    ivector.clear();
+    jvector.clear();
+    CVresult2.clear();
+    return 0;
 }
 
 int main() {
@@ -149,12 +252,6 @@ int main() {
         string gather = getString();
         int judge;
         char firstChar = gather[0];
-        /*
-        if (firstChar != 'V' && firstChar != 'E'){
-            cerr << "Error: The input is invalid." << endl;
-            continue;
-        }
-         */
         if (firstChar == 'V'){
             getVNumber(gather);
             continue;
@@ -167,7 +264,8 @@ int main() {
             }
             judge = 0;
             twoArray();
-            vectorDelete();
+            APPROXVC1();
+            APPROXVC2();
             continue;
         }
 
