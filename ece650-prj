@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 #include <algorithm>
+#include <pthread.h>
 #include <string>
 #include <set>
 using namespace std;
@@ -189,17 +190,21 @@ int APPROXVC2(){
         vector<int>::iterator jsmallest = min_element(begin(jvector), end(jvector));
         int smallest = min(*ismallest, *jsmallest);
         int indexVC;
+        //cout << "ismallest is " << *ismallest << endl;
+        //cout << "jsmallest is " << *jsmallest << endl;
+
+        // Problem is here: when *ismallest == *jsmallest
+
         // get the index of smallest value.
-        cout << "ismallest is " << *ismallest << endl;
-        cout << "jsmallest is " << *jsmallest << endl;
         if (smallest == *ismallest) {
             indexVC = distance(begin(ivector), ismallest);
         } else indexVC = distance(begin(jvector), jsmallest);
+
         if (smallest < 99999) {
             ivalue = iarray[indexVC];
-            cout << "ivalue is " << ivalue << endl;
+            //cout << "ivalue is " << ivalue << endl;
             jvalue = jarray[indexVC];
-            cout << "jvalue is " << jvalue << endl;
+            //cout << "jvalue is " << jvalue << endl;
             // get all the index of same i and j value.
             getIndex(ivalue, ivector);
             getIndex(jvalue, jvector);
@@ -215,6 +220,7 @@ int APPROXVC2(){
             CVresult2.push_back(jvalue);
             // clear the indexvector.
             indexvector.clear();
+            /*
             for (int j = 0; j < ivector.size(); ++j) {
                 cout << ivector[j] << ",";
             }
@@ -223,6 +229,7 @@ int APPROXVC2(){
                 cout << jvector[k] << ",";
             }
             cout << endl;
+             */
         } else break;
     }
     /* problem:
@@ -264,6 +271,8 @@ int main() {
             }
             judge = 0;
             twoArray();
+            //pthread_t thread1;
+            //pthread_create(&thread1, NULL, APPROXVC1(),)
             APPROXVC1();
             APPROXVC2();
             continue;
