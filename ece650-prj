@@ -5,6 +5,8 @@
 #include <vector>
 #include <algorithm>
 #include <pthread.h>
+#include "minisat/core/SolverTypes.h"
+#include "minisat/core/Solver.h"
 #include <string>
 #include <set>
 using namespace std;
@@ -95,6 +97,121 @@ int eInVertex(){
     return temp;
 }
 
+// construct a function to detect if return node is an edge vertex.
+// 1 means that the node is an edge vertex.
+int nodeInVC(int node){
+    for (int i = 0; i < ENumber; ++i) {
+        if (node == iarray[i] || node == jarray[i]){
+            return 1;
+        }
+    }
+    return 0;
+}
+
+// Construct a function to implement the reduction and get the vertex cover result.
+int getVertexCover(int numVC){
+    // allocate on the heap so that we can reset later if needed
+    unique_ptr<Minisat::Solver> solver(new Minisat::Solver());
+    // construct a matrix to store the atomic propositions.
+    vector<vector<Minisat::Lit>> Ttable(VNumber);
+
+    // the n is the number of input vertex.
+    // the k is the size of vertex cover (we start the k from 1 to n).
+    for (int n = 0; n < VNumber; ++n) {
+        for (int k = 0; k < numVC; ++k) {
+            Minisat::Lit literal;
+            literal = Minisat::mkLit(solver -> newVar());
+            Ttable[n].push_back(literal);
+        }
+    }
+
+    // clause 1: At least one vertex is the ith vertex in the vertex cover.
+    // build a vector for literals storing.
+    Minisat::vec<Minisat::Lit> literalVector1;
+    for (int k = 0; k < numVC; ++k) {
+        for (int n = 0; n < VNumber; ++n) {
+            literalVector1.push(Ttable[n][k]);
+        }
+        // add those literals into first clause in solver.
+        solver->addClause(literalVector1);
+        // clear the literal vector for following loop.
+        literalVector1.clear();
+    }
+
+    // clause 2: No one vertex can appear twice in a vertex cover.
+    // (it is not the case that vertex m appears both in positions p and q of the vertex cover.)
+    for (int n = 0; n < VNumber; ++n) {
+        for (int p = 0; p < numVC - 1; ++p) {
+            for (int q = p + 1; q < numVC; ++q) {
+                //cout << "p is " << p << " q is " << q << endl;
+                solver->addClause(~Ttable[n][p], ~Ttable[n][q]);
+            }
+        }
+    }
+
+    // clause 3: No more than one vertex appears in the mth position of the vertex cover.
+    // Just like clause2, but change the column to row.
+    for (int n = 0; n < numVC; ++n) {
+        for (int p = 0; p < VNumber - 1; ++p) {
+            for (int q = p + 1; q < VNumber; ++q) {
+                solver->addClause(~Ttable[p][n], ~Ttable[q][n]);
+            }
+        }
+    }
+
+    // clause 4: Every edge is incident to at least one vertex in the vertex cover.
+    // build a vector for literals storing. Just same as clause1.
+    Minisat::vec<Minisat::Lit> literalVector4;
+    for (int i = 0; i < ENumber; ++i) {
+        for (int k = 0; k < numVC; ++k) {
+            literalVector4.push(Ttable[iarray[i]][k]);
+            literalVector4.push(Ttable[jarray[i]][k]);
+        }
+        // add those literals into first clause in solver.
+        solver->addClause(literalVector4);
+        // clear the literal vector for following loop.
+        literalVector4.clear();
+    }
+
+    vector<int> resultCNF; // construct a vector to store the result from CNF-SAT
+    // if the result is a SAT problem, cout the vertex of vertex cover.
+    if (solver -> solve() == true){
+        //cout << "SAT Result is True" << endl;
+        //cout << "VNumber " << VNumber << endl;
+        //cout << "numVC " << numVC << endl;
+        printf("CNF-SAT-VC: ");
+        // cout << "CNF-SAT-VC: ";
+        for (int m = 0; m < VNumber; ++m) {
+            for (int n = 0; n < numVC; ++n) {
+                if (Minisat::toInt(solver->modelValue(Ttable[m][n])) == 0){
+                    if (nodeInVC(m) == 1) resultCNF.push_back(m);
+                }
+            }
+        }
+        for (int i = 0; i < resultCNF.size(); ++i) {
+            if (resultCNF.size() - 1 != i) printf("%d,",resultCNF[i]);
+                //cout << resultCNF[i] << ",";
+            else printf("%d\n",resultCNF[i]);
+            //  std::cout.flush();
+        }
+        resultCNF.clear();
+        return 1;
+    }
+    else{
+        //cerr << "No vertex cover when numVC is " << numVC << endl;
+        return  0; // means that the numVC should be added to 1.
+    }
+}
+
+void * CNFSATVC(void * args){
+    for (int numVC = 1; numVC < VNumber; ++numVC) {
+        if (getVertexCover(numVC) == 1){
+            break;
+        }
+    }
+}
+
+
 
 // The following is APPROX-VC-1.
 // get the maxcount value and set both values in this vertex to 99999.
@@ -143,7 +260,7 @@ int getMaxCount(){
     return index;
 }
 
-int APPROXVC1(){
+void * APPROXVC1(void * args){
     for (int i = 0; i < EleLength; ++i) {
         edgeVector.push_back(edgeList[i]);
     }
@@ -154,15 +271,17 @@ int APPROXVC1(){
 
     // sort the vertex cover result.
     sort(CVresult1.begin(), CVresult1.end(), less<int>());
-    cout << "APPROX-VC-1: ";
+    printf("APPROX-VC-1: ");
+    // cout << "APPROX-VC-1: ";
     for (int j = 0; j < CVresult1.size(); ++j) {
-        if (j != CVresult1.size()-1) cout << CVresult1[j] << ",";
-        else cout << CVresult1[j] << endl;
+        if (j != CVresult1.size()-1) printf("%d,",CVresult1[j]);
+        else printf("%d\n",CVresult1[j]);//cout << CVresult1[j] << endl;
+        // std::cout.flush();
     }
     // clear all the vector for next input.
     CVresult1.clear();
     edgeVector.clear();
-    return 0;
+    //pthread_exit(NULL);
 }
 
 
@@ -176,7 +295,7 @@ int getIndex(int value, vector<int> vector){
     return 0;
 }
 
-int APPROXVC2(){
+void * APPROXVC2(void * args){
     // transfer the values in array to vector.
     for (int n = 0; n < ENumber; ++n){
         ivector.push_back(iarray[n]);
@@ -242,15 +361,17 @@ int APPROXVC2(){
      */
     // sort the vertex cover result.
     sort(CVresult2.begin(), CVresult2.end(), less<int>());
-    cout << "APPROX-VC-2: ";
+    printf("APPROX-VC-2: ");
+    //cout << "APPROX-VC-2: ";
     for (int j = 0; j < CVresult2.size(); ++j) {
-        if (j != CVresult2.size()-1) cout << CVresult2[j] << ",";
-        else cout << CVresult2[j] << endl;
+        if (j != CVresult2.size()-1) printf("%d,",CVresult2[j]);
+        else printf("%d\n",CVresult2[j]);
+        //std::cout.flush();
     }
     ivector.clear();
     jvector.clear();
     CVresult2.clear();
-    return 0;
+    //pthread_exit(NULL);
 }
 
 int main() {
@@ -271,13 +392,26 @@ int main() {
             }
             judge = 0;
             twoArray();
-            //pthread_t thread1;
-            //pthread_create(&thread1, NULL, APPROXVC1(),)
-            APPROXVC1();
-            APPROXVC2();
+            // start the multi-thread task.
+            int threadResultCNF, threadResult1, threadResult2;
+            pthread_t threadCNF;
+            threadResultCNF = pthread_create(&threadCNF, NULL, CNFSATVC, NULL);
+            pthread_t thread1;
+            threadResult1 = pthread_create(&thread1, NULL, APPROXVC1, NULL);
+            pthread_t thread2;
+            threadResult2 = pthread_create(&thread2, NULL, APPROXVC2, NULL);
+            if (threadResultCNF != 0){
+                cout << "The threadCNF is failed. error_code = " << threadResultCNF << endl;
+            }
+            if (threadResult1 != 0){
+                cout << "The thread1 is failed. error_code = " << threadResult1 << endl;
+            }
+            if (threadResult2 != 0){
+                cout << "The thread2 is failed. error_code = " << threadResult2 << endl;
+            }
             continue;
         }
-
-        return 0;
+        pthread_exit(NULL);
+        //return 0;
     }
 }
