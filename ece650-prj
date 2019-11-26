@@ -5,11 +5,26 @@
 #include <vector>
 #include <algorithm>
 #include <pthread.h>
+#include <time.h>
+#include <signal.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
 #include "minisat/core/SolverTypes.h"
 #include "minisat/core/Solver.h"
-#include <string>
-#include <set>
+#include <fstream>
+#include <string.h>
+#include <cmath>
+#include <numeric>
+//#include "pthread_getcpuclockid.h" // There is no this function in MAC system.
 using namespace std;
+
+#define handle_error(msg) \
+               do { perror(msg); exit(EXIT_FAILURE); } while (0)
+
+#define handle_error_en(en, msg) \
+               do { errno = en; perror(msg); exit(EXIT_FAILURE); } while (0)
 
 // build a array to store edge elements.
 int edgeList[10000];
@@ -21,10 +36,13 @@ vector<int> indexvector; // vector to store the index number of duplicate vertex
 vector<int> edgeVector; // construct a vector to store the edge list。
 vector<int> CVresult2;
 vector<int> CVresult1;
+vector<long> timeCNF, timeAVC1, timeAVC2; // to store the CPU time.
 int EleLength;// the number of edge end and start points.
 int VNumber; //the number of vertexs.
 int ENumber; //the number of edges.
 int startendList[2];
+clockid_t cidCNF, cid1, cid2;
+int CNFDONE = 0;
 
 // function to get the input string.
 string getString(){
@@ -97,6 +115,19 @@ int eInVertex(){
     return temp;
 }
 
+// define a function to output the thread time. Should be modified after all.
+//static void
+timespec pclock(char *msg, clockid_t cid)
+{
+    struct timespec ts;
+
+    printf("%s", msg);
+    if (clock_gettime(cid, &ts) == -1)
+        handle_error("clock_gettime");
+    printf("%ld\n", ts.tv_nsec); // this is nano second, 1 nsec = 10^-9 sec.
+    return ts;
+}
+
 // construct a function to detect if return node is an edge vertex.
 // 1 means that the node is an edge vertex.
 int nodeInVC(int node){
@@ -136,6 +167,8 @@ int getVertexCover(int numVC){
         solver->addClause(literalVector1);
         // clear the literal vector for following loop.
         literalVector1.clear();
+
+        pthread_testcancel();
     }
 
     // clause 2: No one vertex can appear twice in a vertex cover.
@@ -145,6 +178,8 @@ int getVertexCover(int numVC){
             for (int q = p + 1; q < numVC; ++q) {
                 //cout << "p is " << p << " q is " << q << endl;
                 solver->addClause(~Ttable[n][p], ~Ttable[n][q]);
+
+                pthread_testcancel();// set a cancelation point.
             }
         }
     }
@@ -155,6 +190,8 @@ int getVertexCover(int numVC){
         for (int p = 0; p < VNumber - 1; ++p) {
             for (int q = p + 1; q < VNumber; ++q) {
                 solver->addClause(~Ttable[p][n], ~Ttable[q][n]);
+
+                pthread_testcancel();// set a cancelation point.
             }
         }
     }
@@ -166,6 +203,8 @@ int getVertexCover(int numVC){
         for (int k = 0; k < numVC; ++k) {
             literalVector4.push(Ttable[iarray[i]][k]);
             literalVector4.push(Ttable[jarray[i]][k]);
+
+            pthread_testcancel(); // set a cancelation point.
         }
         // add those literals into first clause in solver.
         solver->addClause(literalVector4);
@@ -179,21 +218,24 @@ int getVertexCover(int numVC){
         //cout << "SAT Result is True" << endl;
         //cout << "VNumber " << VNumber << endl;
         //cout << "numVC " << numVC << endl;
-        printf("CNF-SAT-VC: ");
-        // cout << "CNF-SAT-VC: ";
+        //printf("CNF-SAT-VC: ");
         for (int m = 0; m < VNumber; ++m) {
             for (int n = 0; n < numVC; ++n) {
+
+                pthread_testcancel(); // set a cancelation point.
                 if (Minisat::toInt(solver->modelValue(Ttable[m][n])) == 0){
                     if (nodeInVC(m) == 1) resultCNF.push_back(m);
                 }
             }
         }
+        // change the int to string to avoid error output.
+        string s = "CNF-SAT-VC: ";
         for (int i = 0; i < resultCNF.size(); ++i) {
-            if (resultCNF.size() - 1 != i) printf("%d,",resultCNF[i]);
-                //cout << resultCNF[i] << ",";
-            else printf("%d\n",resultCNF[i]);
-            //  std::cout.flush();
+            if (resultCNF.size() - 1 != i) s = s + to_string(resultCNF[i]) + ",";
+            else s = s + to_string(resultCNF[i]);
         }
+        // print the string.
+        printf("%s\n",s.c_str());
         resultCNF.clear();
         return 1;
     }
@@ -204,11 +246,23 @@ int getVertexCover(int numVC){
 }
 
 void * CNFSATVC(void * args){
+    CNFDONE = 0;
     for (int numVC = 1; numVC < VNumber; ++numVC) {
         if (getVertexCover(numVC) == 1){
+            CNFDONE = 1;
             break;
         }
     }
+    // get the CPU time
+    /*
+    int sCNF;
+    sCNF = pthread_getcpuclockid(pthread_self(), &cidCNF);
+    if (sCNF != 0)
+        handle_error_en(sCNF, "pthread_getcpuclockid");
+     */
+    // put the CPU time into a vector
+    timespec tCNF = pclock("CNF thread CPU time: ",cidCNF);
+    timeCNF.push_back(tCNF.tv_nsec);
 }
 
 
@@ -271,17 +325,29 @@ void * APPROXVC1(void * args){
 
     // sort the vertex cover result.
     sort(CVresult1.begin(), CVresult1.end(), less<int>());
-    printf("APPROX-VC-1: ");
     // cout << "APPROX-VC-1: ";
+    // change the int to string to avoid error output.
+    string s = "APPROX-VC-1: ";
     for (int j = 0; j < CVresult1.size(); ++j) {
-        if (j != CVresult1.size()-1) printf("%d,",CVresult1[j]);
-        else printf("%d\n",CVresult1[j]);//cout << CVresult1[j] << endl;
-        // std::cout.flush();
+        if (j != CVresult1.size()-1) s = s + to_string(CVresult1[j]) + ",";
+        else s = s + to_string(CVresult1[j]);
     }
+    // print the string.
+    printf("%s\n", s.c_str());
     // clear all the vector for next input.
     CVresult1.clear();
     edgeVector.clear();
     //pthread_exit(NULL);
+    // get the CPU time
+    /*
+    int s1;
+    s1 = pthread_getcpuclockid(pthread_self(), &cid1);
+    if (s1 != 0)
+        handle_error_en(s1, "pthread_getcpuclockid");
+     */
+    // put the CPU time into a vector
+    timespec tAVC1 = pclock("APPROX-VC-1 thread CPU time: ",cid1);
+    timeAVC1.push_back(tAVC1.tv_nsec);
 }
 
 
@@ -361,17 +427,103 @@ void * APPROXVC2(void * args){
      */
     // sort the vertex cover result.
     sort(CVresult2.begin(), CVresult2.end(), less<int>());
-    printf("APPROX-VC-2: ");
     //cout << "APPROX-VC-2: ";
+    // change the int to string to avoid error output.
+    string s = "APPROX-VC-2: ";
     for (int j = 0; j < CVresult2.size(); ++j) {
-        if (j != CVresult2.size()-1) printf("%d,",CVresult2[j]);
-        else printf("%d\n",CVresult2[j]);
+        if (j != CVresult2.size()-1) s = s + to_string(CVresult2[j]) + ",";
+        else s = s + to_string(CVresult2[j]);
         //std::cout.flush();
     }
+    printf("%s\n", s.c_str());
     ivector.clear();
     jvector.clear();
     CVresult2.clear();
     //pthread_exit(NULL);
+    // get the CPU time
+    /*
+    int s2;
+    s2 = pthread_getcpuclockid(pthread_self(), &cid2);
+    if (s2 != 0)
+        handle_error_en(s2, "pthread_getcpuclockid");
+     */
+    // put the CPU time into a vector
+    timespec tAVC2 = pclock("APPROX-VC-2 thread CPU time: ",cid2);
+    timeAVC2.push_back(tAVC2.tv_nsec);
+}
+
+void timeout(pthread_t pthread){
+    if (CNFDONE == 0){
+        printf("CNF-SAT-VC: timeout\n");
+        int cancel = pthread_cancel(pthread);
+        if (cancel != 0)
+            handle_error_en(cancel, "pthread_cancel is failed");
+    }
+}
+
+long getSD(std::vector<long> data)
+{
+    long sum = 0;
+    long average;
+    long SD = 0;
+    for(int i = 0; i < data.size(); ++i)
+    {
+        sum += data[i];
+    }
+    average = sum / data.size();
+    for(int j = 0; j < data.size(); ++j)
+         SD += pow(data[j] - average, 2);
+    return sqrt(SD / data.size());
+}
+
+int writeFile(){
+    long averageAVC1 = accumulate( timeAVC1.begin(), timeAVC1.end(), 0.0) / timeAVC1.size();
+    long sdAVC1 = getSD(timeAVC1);
+    long averageAVC2 = accumulate( timeAVC2.begin(), timeAVC2.end(), 0.0) / timeAVC2.size();
+    long sdAVC2 = getSD(timeAVC2);
+
+    // create and open the .txt file.
+    ofstream OutFile("output_prj.txt");
+
+    // detect if CNF finished in the given time.
+    if (CNFDONE == 1){
+        long averageCNF = accumulate( timeCNF.begin(), timeCNF.end(), 0.0) / timeCNF.size();
+        long sdCNF = getSD(timeCNF);
+        // write done the CNF result
+        OutFile << "CNF CPU time write Start" << endl;
+        for (int i = 0; i < timeCNF.size(); ++i) {
+            OutFile << timeCNF[i] << endl;
+        }
+        OutFile << "CNF Average = " << averageCNF << endl;
+        OutFile << "CNF SD = " << sdCNF << endl;
+        OutFile << "CNF Finished\n" << endl;
+    }
+
+    // write done the APPROX-VC-1 result.
+    OutFile << "AVC1 CPU time write Start" << endl;
+    for (int i = 0; i < timeAVC1.size(); ++i) {
+        OutFile << timeAVC1[i] << endl;
+    }
+    OutFile << "AVC1 Average = " << averageAVC1 << endl;
+    OutFile << "AVC1 SD = " << sdAVC1 << endl;
+    OutFile << "AVC1 Finished\n" << endl;
+
+    // write done the APPROX-VC-2 result.
+    OutFile << "AVC2 CPU time write Start" << endl;
+    for (int i = 0; i < timeAVC2.size(); ++i) {
+        OutFile << timeAVC2[i] << endl;
+    }
+    OutFile << "AVC2 Average = " << averageAVC2 << endl;
+    OutFile << "AVC2 SD = " << sdAVC2 << endl;
+    OutFile << "AVC2 Finished\n" << endl;
+
+    // close the .txt file.
+    OutFile.close();
+
+    // clear the vector for next generation.
+    timeCNF.clear();
+    timeAVC1.clear();
+    timeAVC2.clear();
 }
 
 int main() {
@@ -379,6 +531,7 @@ int main() {
     {
         string gather = getString();
         int judge;
+        int s;
         char firstChar = gather[0];
         if (firstChar == 'V'){
             getVNumber(gather);
@@ -394,21 +547,45 @@ int main() {
             twoArray();
             // start the multi-thread task.
             int threadResultCNF, threadResult1, threadResult2;
+
             pthread_t threadCNF;
             threadResultCNF = pthread_create(&threadCNF, NULL, CNFSATVC, NULL);
-            pthread_t thread1;
-            threadResult1 = pthread_create(&thread1, NULL, APPROXVC1, NULL);
-            pthread_t thread2;
-            threadResult2 = pthread_create(&thread2, NULL, APPROXVC2, NULL);
             if (threadResultCNF != 0){
                 cout << "The threadCNF is failed. error_code = " << threadResultCNF << endl;
             }
+
+            pthread_t thread1;
+            threadResult1 = pthread_create(&thread1, NULL, APPROXVC1, NULL);
             if (threadResult1 != 0){
                 cout << "The thread1 is failed. error_code = " << threadResult1 << endl;
             }
+
+            pthread_t thread2;
+            threadResult2 = pthread_create(&thread2, NULL, APPROXVC2, NULL);
             if (threadResult2 != 0){
                 cout << "The thread2 is failed. error_code = " << threadResult2 << endl;
             }
+
+            // if CNF does not finish in a given time, the cancel signal will be sent.
+            sleep(1); // you can change the time of timeout here.
+            timeout(threadCNF);
+            pthread_join(threadCNF, NULL); // I do not know if we can delete this without any thread problems.
+            pthread_join(thread1, NULL);
+            pthread_join(thread2, NULL);
+
+            /*clockid_t cid;
+            s = pthread_getcpuclockid(pthread_self(), &cid);
+            if (s != 0)
+                handle_error_en(s, "pthread_getcpuclockid");
+            pclock("Main thread CPU time:   ", cid);
+             */
+            pclock("Main thread CPU time: ", CLOCK_THREAD_CPUTIME_ID);
+            pclock("Process total CPU time: ", CLOCK_PROCESS_CPUTIME_ID);
+            continue;
+        }
+        if (firstChar == 'W'){
+            writeFile();
+            cout << "output_prj.txt has been generated." << endl;
             continue;
         }
         pthread_exit(NULL);
