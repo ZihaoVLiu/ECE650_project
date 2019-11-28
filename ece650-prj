@@ -37,12 +37,15 @@ vector<int> edgeVector; // construct a vector to store the edge list。
 vector<int> CVresult2;
 vector<int> CVresult1;
 vector<long> timeCNF, timeAVC1, timeAVC2; // to store the CPU time.
+vector<float> approxResult1, approxResult2;
 int EleLength;// the number of edge end and start points.
 int VNumber; //the number of vertexs.
 int ENumber; //the number of edges.
+float resultCNFSize, CVresult2Size, CVresult1Size; // used to store the result size.
 int startendList[2];
 clockid_t cidCNF, cid1, cid2;
 int CNFDONE = 0;
+int Loopcount = 0;
 
 // function to get the input string.
 string getString(){
@@ -121,10 +124,10 @@ timespec pclock(char *msg, clockid_t cid)
 {
     struct timespec ts;
 
-    printf("%s", msg);
+    // printf("%s", msg);
     if (clock_gettime(cid, &ts) == -1)
         handle_error("clock_gettime");
-    printf("%ld\n", ts.tv_nsec); // this is nano second, 1 nsec = 10^-9 sec.
+    printf("%s%ld\n", msg, ts.tv_nsec); // this is nano second, 1 nsec = 10^-9 sec.
     return ts;
 }
 
@@ -236,6 +239,7 @@ int getVertexCover(int numVC){
         }
         // print the string.
         printf("%s\n",s.c_str());
+        resultCNFSize = resultCNF.size();
         resultCNF.clear();
         return 1;
     }
@@ -335,6 +339,7 @@ void * APPROXVC1(void * args){
     // print the string.
     printf("%s\n", s.c_str());
     // clear all the vector for next input.
+    CVresult1Size = CVresult1.size();
     CVresult1.clear();
     edgeVector.clear();
     //pthread_exit(NULL);
@@ -438,6 +443,7 @@ void * APPROXVC2(void * args){
     printf("%s\n", s.c_str());
     ivector.clear();
     jvector.clear();
+    CVresult2Size = CVresult2.size();
     CVresult2.clear();
     //pthread_exit(NULL);
     // get the CPU time
@@ -459,6 +465,12 @@ void timeout(pthread_t pthread){
         if (cancel != 0)
             handle_error_en(cancel, "pthread_cancel is failed");
     }
+    else{
+        printf("ratio AVC1 = %f\n", CVresult1Size/resultCNFSize);
+        approxResult1.push_back(CVresult1Size/resultCNFSize);
+        printf("ratio AVC2 = %f\n", CVresult2Size/resultCNFSize);
+        approxResult2.push_back(CVresult2Size/resultCNFSize);
+    }
 }
 
 long getSD(std::vector<long> data)
@@ -476,11 +488,31 @@ long getSD(std::vector<long> data)
     return sqrt(SD / data.size());
 }
 
+float getSDFloat(std::vector<float> data)
+{
+    float sum = 0;
+    float average;
+    float SD = 0;
+    for(int i = 0; i < data.size(); ++i)
+    {
+        sum += data[i];
+    }
+    average = sum / data.size();
+    for(int j = 0; j < data.size(); ++j)
+        SD += pow(data[j] - average, 2);
+    return sqrt(SD / data.size());
+}
+
+
 int writeFile(){
     long averageAVC1 = accumulate( timeAVC1.begin(), timeAVC1.end(), 0.0) / timeAVC1.size();
     long sdAVC1 = getSD(timeAVC1);
     long averageAVC2 = accumulate( timeAVC2.begin(), timeAVC2.end(), 0.0) / timeAVC2.size();
     long sdAVC2 = getSD(timeAVC2);
+    float averageRatio1 = accumulate( approxResult1.begin(), approxResult1.end(), 0.0) / approxResult1.size();
+    float sdRatio1 = getSDFloat(approxResult1);
+    float averageRatio2 = accumulate( approxResult2.begin(), approxResult2.end(), 0.0) / approxResult2.size();
+    float sdRatio2 = getSDFloat(approxResult2);
 
     // create and open the .txt file.
     ofstream OutFile("output_prj.txt");
@@ -497,6 +529,8 @@ int writeFile(){
         OutFile << "CNF Average = " << averageCNF << endl;
         OutFile << "CNF SD = " << sdCNF << endl;
         OutFile << "CNF Finished\n" << endl;
+
+        printf("CNF Average time = %ld\nCNF SD = %ld\n", averageCNF, sdCNF);
     }
 
     // write done the APPROX-VC-1 result.
@@ -507,6 +541,8 @@ int writeFile(){
     OutFile << "AVC1 Average = " << averageAVC1 << endl;
     OutFile << "AVC1 SD = " << sdAVC1 << endl;
     OutFile << "AVC1 Finished\n" << endl;
+    printf("AVC1 Average time = %ld\nAVC1 SD = %ld\n", averageAVC1, sdAVC1);
+    printf("Ratio 1 Average = %f\nRatio1 SD = %f\n", averageRatio1, sdRatio1);
 
     // write done the APPROX-VC-2 result.
     OutFile << "AVC2 CPU time write Start" << endl;
@@ -516,6 +552,8 @@ int writeFile(){
     OutFile << "AVC2 Average = " << averageAVC2 << endl;
     OutFile << "AVC2 SD = " << sdAVC2 << endl;
     OutFile << "AVC2 Finished\n" << endl;
+    printf("AVC2 Average time = %ld\nAVC2 SD = %ld\n", averageAVC2, sdAVC2);
+    printf("Ratio 2 Average = %f\nRatio2 SD = %f\n", averageRatio2, sdRatio2);
 
     // close the .txt file.
     OutFile.close();
@@ -524,6 +562,8 @@ int writeFile(){
     timeCNF.clear();
     timeAVC1.clear();
     timeAVC2.clear();
+    approxResult1.clear();
+    approxResult2.clear();
 }
 
 int main() {
@@ -531,7 +571,6 @@ int main() {
     {
         string gather = getString();
         int judge;
-        int s;
         char firstChar = gather[0];
         if (firstChar == 'V'){
             getVNumber(gather);
@@ -573,14 +612,22 @@ int main() {
             pthread_join(thread1, NULL);
             pthread_join(thread2, NULL);
 
+
+            Loopcount = Loopcount + 1;
+            //cout << "Loopcount is " << Loopcount << endl;
+            if (Loopcount == 100){
+                writeFile(); // output the average time and SD.
+                cout << "Output.txt finished." << endl;
+            }
+
             /*clockid_t cid;
             s = pthread_getcpuclockid(pthread_self(), &cid);
             if (s != 0)
                 handle_error_en(s, "pthread_getcpuclockid");
             pclock("Main thread CPU time:   ", cid);
              */
-            pclock("Main thread CPU time: ", CLOCK_THREAD_CPUTIME_ID);
-            pclock("Process total CPU time: ", CLOCK_PROCESS_CPUTIME_ID);
+            //pclock("Main thread CPU time: ", CLOCK_THREAD_CPUTIME_ID);
+            //pclock("Process total CPU time: ", CLOCK_PROCESS_CPUTIME_ID);
             continue;
         }
         if (firstChar == 'W'){
