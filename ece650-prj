@@ -44,8 +44,13 @@ int ENumber; //the number of edges.
 float resultCNFSize, CVresult2Size, CVresult1Size; // used to store the result size.
 int startendList[2];
 clockid_t cidCNF, cid1, cid2;
-int CNFDONE = 0;
+int CNFDONE = 0, AVC1DONE = 0, AVC2DONE = 0;
 int Loopcount = 0;
+int Trigger = 0;
+string sCNF = "CNF-SAT-VC: ";
+string sAVC1 = "APPROX-VC-1: ";
+string sAVC2 = "APPROX-VC-2: ";
+int EOFtheP = 0;
 
 // function to get the input string.
 string getString(){
@@ -149,6 +154,7 @@ int getVertexCover(int numVC){
     // construct a matrix to store the atomic propositions.
     vector<vector<Minisat::Lit>> Ttable(VNumber);
 
+
     // the n is the number of input vertex.
     // the k is the size of vertex cover (we start the k from 1 to n).
     for (int n = 0; n < VNumber; ++n) {
@@ -232,13 +238,13 @@ int getVertexCover(int numVC){
             }
         }
         // change the int to string to avoid error output.
-        string s = "CNF-SAT-VC: ";
+        //string s = "CNF-SAT-VC: ";
         for (int i = 0; i < resultCNF.size(); ++i) {
-            if (resultCNF.size() - 1 != i) s = s + to_string(resultCNF[i]) + ",";
-            else s = s + to_string(resultCNF[i]);
+            if (resultCNF.size() - 1 != i) sCNF = sCNF + to_string(resultCNF[i]) + ",";
+            else sCNF = sCNF + to_string(resultCNF[i]);
         }
         // print the string.
-        printf("%s\n",s.c_str());
+        //printf("%s\n",sCNF.c_str());
         resultCNFSize = resultCNF.size();
         resultCNF.clear();
         return 1;
@@ -265,8 +271,8 @@ void * CNFSATVC(void * args){
         handle_error_en(sCNF, "pthread_getcpuclockid");
      */
     // put the CPU time into a vector
-    timespec tCNF = pclock("CNF thread CPU time: ",cidCNF);
-    timeCNF.push_back(tCNF.tv_nsec);
+    //timespec tCNF = pclock("CNF thread CPU time: ",cidCNF);
+    //timeCNF.push_back(tCNF.tv_nsec);
 }
 
 
@@ -331,13 +337,14 @@ void * APPROXVC1(void * args){
     sort(CVresult1.begin(), CVresult1.end(), less<int>());
     // cout << "APPROX-VC-1: ";
     // change the int to string to avoid error output.
-    string s = "APPROX-VC-1: ";
+    //string s = "APPROX-VC-1: ";
     for (int j = 0; j < CVresult1.size(); ++j) {
-        if (j != CVresult1.size()-1) s = s + to_string(CVresult1[j]) + ",";
-        else s = s + to_string(CVresult1[j]);
+        if (j != CVresult1.size()-1) sAVC1 = sAVC1 + to_string(CVresult1[j]) + ",";
+        else sAVC1 = sAVC1 + to_string(CVresult1[j]);
     }
     // print the string.
-    printf("%s\n", s.c_str());
+    //printf("%s\n", sAVC1.c_str());
+    AVC1DONE = 1;
     // clear all the vector for next input.
     CVresult1Size = CVresult1.size();
     CVresult1.clear();
@@ -351,8 +358,8 @@ void * APPROXVC1(void * args){
         handle_error_en(s1, "pthread_getcpuclockid");
      */
     // put the CPU time into a vector
-    timespec tAVC1 = pclock("APPROX-VC-1 thread CPU time: ",cid1);
-    timeAVC1.push_back(tAVC1.tv_nsec);
+    //timespec tAVC1 = pclock("APPROX-VC-1 thread CPU time: ",cid1);
+    //timeAVC1.push_back(tAVC1.tv_nsec);
 }
 
 
@@ -434,19 +441,20 @@ void * APPROXVC2(void * args){
     sort(CVresult2.begin(), CVresult2.end(), less<int>());
     //cout << "APPROX-VC-2: ";
     // change the int to string to avoid error output.
-    string s = "APPROX-VC-2: ";
+    //string s = "APPROX-VC-2: ";
     for (int j = 0; j < CVresult2.size(); ++j) {
-        if (j != CVresult2.size()-1) s = s + to_string(CVresult2[j]) + ",";
-        else s = s + to_string(CVresult2[j]);
+        if (j != CVresult2.size()-1) sAVC2 = sAVC2 + to_string(CVresult2[j]) + ",";
+        else sAVC2 = sAVC2 + to_string(CVresult2[j]);
         //std::cout.flush();
     }
-    printf("%s\n", s.c_str());
+    //printf("%s\n", sAVC2.c_str());
+    AVC2DONE = 1;
     ivector.clear();
     jvector.clear();
     CVresult2Size = CVresult2.size();
     CVresult2.clear();
     //pthread_exit(NULL);
-    // get the CPU time
+    // get tlshe CPU time
     /*
     int s2;
     s2 = pthread_getcpuclockid(pthread_self(), &cid2);
@@ -454,23 +462,25 @@ void * APPROXVC2(void * args){
         handle_error_en(s2, "pthread_getcpuclockid");
      */
     // put the CPU time into a vector
-    timespec tAVC2 = pclock("APPROX-VC-2 thread CPU time: ",cid2);
-    timeAVC2.push_back(tAVC2.tv_nsec);
+    //timespec tAVC2 = pclock("APPROX-VC-2 thread CPU time: ",cid2);
+    //timeAVC2.push_back(tAVC2.tv_nsec);
 }
 
 void timeout(pthread_t pthread){
     if (CNFDONE == 0){
-        printf("CNF-SAT-VC: timeout\n");
+        //printf("CNF-SAT-VC: timeout\n");
         int cancel = pthread_cancel(pthread);
         if (cancel != 0)
             handle_error_en(cancel, "pthread_cancel is failed");
     }
+    /*
     else{
         printf("ratio AVC1 = %f\n", CVresult1Size/resultCNFSize);
         approxResult1.push_back(CVresult1Size/resultCNFSize);
         printf("ratio AVC2 = %f\n", CVresult2Size/resultCNFSize);
         approxResult2.push_back(CVresult2Size/resultCNFSize);
     }
+     */
 }
 
 long getSD(std::vector<long> data)
@@ -566,13 +576,12 @@ int writeFile(){
     approxResult2.clear();
 }
 
-int main() {
-    for (;;)
-    {
+void * IO(void * args){
+    while (!cin.eof()){
         string gather = getString();
         int judge;
         char firstChar = gather[0];
-        if (firstChar == 'V'){
+        if (firstChar == 'V') {
             getVNumber(gather);
             continue;
         }
@@ -584,58 +593,111 @@ int main() {
             }
             judge = 0;
             twoArray();
-            // start the multi-thread task.
-            int threadResultCNF, threadResult1, threadResult2;
-
-            pthread_t threadCNF;
-            threadResultCNF = pthread_create(&threadCNF, NULL, CNFSATVC, NULL);
-            if (threadResultCNF != 0){
-                cout << "The threadCNF is failed. error_code = " << threadResultCNF << endl;
-            }
-
-            pthread_t thread1;
-            threadResult1 = pthread_create(&thread1, NULL, APPROXVC1, NULL);
-            if (threadResult1 != 0){
-                cout << "The thread1 is failed. error_code = " << threadResult1 << endl;
-            }
-
-            pthread_t thread2;
-            threadResult2 = pthread_create(&thread2, NULL, APPROXVC2, NULL);
-            if (threadResult2 != 0){
-                cout << "The thread2 is failed. error_code = " << threadResult2 << endl;
-            }
-
-            // if CNF does not finish in a given time, the cancel signal will be sent.
-            sleep(1); // you can change the time of timeout here.
-            timeout(threadCNF);
-            pthread_join(threadCNF, NULL); // I do not know if we can delete this without any thread problems.
-            pthread_join(thread1, NULL);
-            pthread_join(thread2, NULL);
-
-
-            Loopcount = Loopcount + 1;
-            //cout << "Loopcount is " << Loopcount << endl;
-            if (Loopcount == 100){
-                writeFile(); // output the average time and SD.
-                cout << "Output.txt finished." << endl;
-            }
-
-            /*clockid_t cid;
-            s = pthread_getcpuclockid(pthread_self(), &cid);
-            if (s != 0)
-                handle_error_en(s, "pthread_getcpuclockid");
-            pclock("Main thread CPU time:   ", cid);
-             */
-            //pclock("Main thread CPU time: ", CLOCK_THREAD_CPUTIME_ID);
-            //pclock("Process total CPU time: ", CLOCK_PROCESS_CPUTIME_ID);
-            continue;
+            Trigger = 1;
         }
-        if (firstChar == 'W'){
-            writeFile();
-            cout << "output_prj.txt has been generated." << endl;
-            continue;
+        if (cin.eof()){
+            EOFtheP = 1;
+
         }
-        pthread_exit(NULL);
+        while (1){
+            if (Trigger == 0){
+                //sleep(2); // you can change the sleep time here.
+                if (AVC1DONE == 1 && AVC2DONE == 1 && CNFDONE == 1){
+                    printf("%s\n", sCNF.c_str());
+                    printf("%s\n", sAVC1.c_str());
+                    printf("%s\n", sAVC2.c_str());
+                    sCNF = "CNF-SAT-VC: ";
+                    sAVC1 = "APPROX-VC-1: ";
+                    sAVC2 = "APPROX-VC-2: ";
+                    AVC1DONE = 0;
+                    AVC2DONE = 0;
+                    //CNFDONE = 0;
+                    break;
+                }
+                if (AVC1DONE == 1 && AVC2DONE == 1 && CNFDONE == 0){
+                    printf("CNF-SAT-VC: timeout\n");
+                    printf("%s\n", sAVC1.c_str());
+                    printf("%s\n", sAVC2.c_str());
+                    sCNF = "CNF-SAT-VC: ";
+                    sAVC1 = "APPROX-VC-1: ";
+                    sAVC2 = "APPROX-VC-2: ";
+                    AVC1DONE = 0;
+                    AVC2DONE = 0;
+                    CNFDONE = 0;
+                    break;
+                }
+            }
+        }
+        break;
+    }
+}
+
+
+int main() {
+    while (1) {
+        // start the multi-thread task.
+        int threadResultIO, threadResultCNF, threadResult1, threadResult2;
+
+        pthread_t threadIO;
+        threadResultIO = pthread_create(&threadIO, NULL, IO, NULL);
+        if (threadResultIO != 0) {
+            cout << "The threadIO is failed. error_code = " << threadResultIO << endl;
+        }
+
+
+        while (1){
+            if (EOFtheP == 1){
+                EOFtheP = 0;
+                return 0;
+            }
+            if (Trigger == 1){
+                pthread_t threadCNF;
+                threadResultCNF = pthread_create(&threadCNF, NULL, CNFSATVC, NULL);
+                if (threadResultCNF != 0) {
+                    cout << "The threadCNF is failed. error_code = " << threadResultCNF << endl;
+                }
+                pthread_t thread1;
+                threadResult1 = pthread_create(&thread1, NULL, APPROXVC1, NULL);
+                if (threadResult1 != 0) {
+                    cout << "The thread1 is failed. error_code = " << threadResult1 << endl;
+                }
+                pthread_t thread2;
+                threadResult2 = pthread_create(&thread2, NULL, APPROXVC2, NULL);
+                if (threadResult2 != 0) {
+                    cout << "The thread2 is failed. error_code = " << threadResult2 << endl;
+                }
+                // if CNF does not finish in a given time, the cancel signal will be sent.
+                sleep(2); // you can change the time of timeout here.
+                timeout(threadCNF);
+                pthread_join(threadCNF, NULL); // I do not know if we can delete this without any thread problems.
+                pthread_join(thread1, NULL);
+                pthread_join(thread2, NULL);
+                Trigger = 0;
+                break;
+            }
+        }
+        pthread_join(threadIO, NULL);
+
+        /*
+        Loopcount = Loopcount + 1;
+        if (Loopcount == 100) {
+            writeFile(); // output the average time and SD.
+            cout << "Output.txt finished." << endl;
+        }
+         */
+
+
+        /*clockid_t cid;
+        s = pthread_getcpuclockid(pthread_self(), &cid);
+        if (s != 0)
+            handle_error_en(s, "pthread_getcpuclockid");
+        pclock("Main thread CPU time:   ", cid);
+         */
+        //pclock("Main thread CPU time: ", CLOCK_THREAD_CPUTIME_ID);
+        //pclock("Process total CPU time: ", CLOCK_PROCESS_CPUTIME_ID);
+        //Trigger = 0;
+        // pthread_exit(NULL);
         //return 0;
     }
+    return 0;
 }
