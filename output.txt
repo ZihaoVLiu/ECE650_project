@@ -1,0 +1,118 @@
+Marking #1: StudentInfo(repo='z583liu', first='Zihao', last='Liu', watiam='z583liu', studentid='20750564', email='z583liu@edu.uwaterloo.ca')
+Mark = 0
+
+Running test 0:	 +20 	 20 total
+
+
+--------------
+Running test: tests_vc-1/test01.in
+
+# test01.in
+# marks = 10
+
+V 5
+E {<0,1>,<0,2>,<0,3>,<0,4>}
+
+Output:
+----
+CNF-SAT-VC: 0
+APPROX-VC-1: 0
+APPROX-VC-2: 0,1
+----
+
+Expected result for vc-1 :
+----
+0
+----
+Comparison result:	Equal
+
+Marks: +10	(30 total)
+
+--------------
+Running test: tests_vc-1/test02.in
+
+# test02.in
+# marks = 10
+
+V 7
+E {<0,1>,<0,2>,<0,3>,<0,4>,<4,5>,<4,6>}
+Output:
+----
+CNF-SAT-VC: 0,4
+APPROX-VC-1: 0,4
+APPROX-VC-2: 0,1,4,5
+----
+
+Expected result for vc-1 :
+----
+0,4
+----
+Comparison result:	Equal
+
+Marks: +10	(40 total)
+
+--------------
+Running test: tests_vc-2/test03.in
+
+# test03.in 
+# marks = 10
+
+V 10
+E {<0,1>,<2,3>,<4,5>,<6,7>,<8,9>}
+
+Output:
+----
+CNF-SAT-VC: 0,2,4,6,8
+APPROX-VC-1: 0,2,4,6,8
+APPROX-VC-2: 0,1,2,3,4,5,6,7,8,9
+----
+
+Expected result for vc-2 :
+----
+0,1,2,3,4,5,6,7,8,9
+----
+Comparison result:	Equal
+
+Marks: +10	(50 total)
+
+--------------
+Running test: tests_vc-2/test04.in
+
+# test04.in
+# marks = 10
+
+V 4
+E {<0,1>,<1,2>,<3,2>,<3,0>}
+
+Output:
+----
+CNF-SAT-VC: 0,2
+APPROX-VC-1: 0,2
+APPROX-VC-2: 0,1,2,3
+----
+
+Expected result for vc-2 :
+----
+0,1,2,3
+----
+Comparison result:	Equal
+
+Marks: +10	(60 total)
+
+
+--------------
+
+Finished marking
+Total mark: 60 / 60
+Final mark: 60
+
+           __    ______    ______   ________ 
+         _/  \  /      \  /      \ |        \
+        |   $$ |  $$$$$$\|  $$$$$$\ \$$$$$$$$
+         \$$$$  \$$__| $$ \$$__| $$    /  $$ 
+          | $$   |     $$  |     $$   /  $$  
+          | $$  __\$$$$$\ __\$$$$$\  /  $$   
+         _| $$_|  \__| $$|  \__| $$ /  $$    
+        |   $$ \\$$    $$ \$$    $$|  $$     
+         \$$$$$$ \$$$$$$   \$$$$$$  \$$      
+        
