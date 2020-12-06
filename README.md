@@ -1,28 +1,10 @@
-# ECE650 : Final Project
+## This projec is to help the local polic department with their installation of security cameras at traffic intersections.
+By solving a optimization problem, calle the Vertex Cover problem, allows th polic to be able to minimize the number of cameras they nee to install, and still be effective as possible wit their monitoring.
 
-Replace FIRST_NAME, LAST_NAME, WATIAM, and STUDENT_ID, EMAIL in
-`user.yml` by your first and last name, WatIAM id, student number, and
-email, respectively. The information must be entered for all members
-of your tema. Whenever possible, please use ASCII characters.
+- Designed a complete system to recommend the locations of monitors to cover all traffic intersections with minimum number of monitors, which supports adding/changing/removing streets operations and generating graph structure to provide the optimal solution.
 
-Do not change the format `user.yml`. We will parse it
-automatically. Only enter the information requested.
+- Integrated four modules working in order automatically as multiprocess with advanced Linux programming.
 
-The main executable file for your solution to the assignment should be
-`ece650-prj`.
+- Improved human-machine interface experience by increasing system error tolerance; promoted the efficiency of system test by building an extra random qualified streets generation system.
 
-Do not include MiniSat in your repository. We will clone it in your
-repository using the command. This is exactly the same as was done in
-Assignment 4.
-
-```
-git clone https://github.com/agurfinkel/minisat
-```
-
-Note that for the project you have to create a `CMakeLists.txt` on
-your own. You can use examples from previous assignments or from
-course examples on GitHub.
-
-Do not forget to include your report in `report.pdf`
-
-Commit your changes and submit on GitHub.
+- Reduced running time sharply while reaching 90% accuracy on large input by trading off time complexity and approximation ratio through quantitative analysis of three different algorithms.
